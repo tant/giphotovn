@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GIPhoto - Tìm kiếm ảnh thể thao",
+  title: "Sports Moments - Tìm kiếm ảnh thể thao",
   description: "Tìm kiếm ảnh thể thao theo số bib",
 };
 

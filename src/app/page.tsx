@@ -37,7 +37,7 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">
-              GIPhoto
+              Sports Moments
             </h1>
             <div className="relative">
               <input
@@ -124,7 +124,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-zinc-200 bg-white py-6 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto max-w-7xl px-4 text-center text-sm text-zinc-500 dark:text-zinc-400 sm:px-6 lg:px-8">
-          <p>GIPhoto - Tìm kiếm ảnh thể thao theo số bib</p>
+          <p>Sports Moments - Tìm kiếm ảnh thể thao theo số bib</p>
         </div>
       </footer>
     </div>
