@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Photo, Event } from '@/types';
@@ -17,20 +17,18 @@ export default function EventPage() {
   const [bibNumber, setBibNumber] = useState('');
   const [searchedBib, setSearchedBib] = useState('');
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [eventLoading, setEventLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPhotos, setTotalPhotos] = useState(0);
   const [hasSearched, setHasSearched] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    loadEvent();
-  }, [slug]);
-
-  const loadEvent = async () => {
+  const loadEvent = useCallback(async () => {
     try {
       setEventLoading(true);
-      const response = await fetchEvents({ limit: 100 });
+      const response = await fetchEvents({ search: slug, limit: 100 });
       const foundEvent = response.data.find((e) => e.slug === slug);
       setEvent(foundEvent || null);
     } catch (error) {
@@ -38,20 +36,37 @@ export default function EventPage() {
     } finally {
       setEventLoading(false);
     }
-  };
+  }, [slug]);
 
-  const searchPhotos = useCallback(
-    async (page: number = 1, append: boolean = false) => {
-      if (!bibNumber.trim()) return;
+  const loadPhotos = useCallback(
+    async (options: { search?: string; page?: number; append?: boolean }) => {
+      const { search, page = 1, append = false } = options;
+      const isLoadMore = append;
+
+      if (!isLoadMore) {
+        abortControllerRef.current?.abort();
+      }
+      const controller = new AbortController();
+      if (!isLoadMore) {
+        abortControllerRef.current = controller;
+      }
 
       try {
-        setLoading(true);
+        if (isLoadMore) {
+          setLoadingMore(true);
+        } else {
+          setInitialLoading(true);
+        }
+
         const response = await fetchPhotos({
           slug,
-          search: bibNumber.trim(),
+          search,
           limit: PHOTOS_PER_PAGE,
           page,
+          signal: controller.signal,
         });
+
+        if (controller.signal.aborted) return;
 
         if (append) {
           setPhotos((prev) => [...prev, ...response.data]);
@@ -61,27 +76,49 @@ export default function EventPage() {
 
         setTotalPhotos(response.total);
         setCurrentPage(response.current_page);
-        setSearchedBib(bibNumber.trim());
-        setHasSearched(true);
       } catch (error) {
-        console.error('Failed to fetch photos:', error);
+        if ((error as Error).name !== 'AbortError') {
+          console.error('Failed to fetch photos:', error);
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setInitialLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
-    [slug, bibNumber]
+    [slug]
   );
+
+  useEffect(() => {
+    loadEvent();
+    loadPhotos({});
+    return () => abortControllerRef.current?.abort();
+  }, [loadEvent, loadPhotos]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPhotos([]);
-    searchPhotos(1, false);
+    const bib = bibNumber.trim();
+    if (bib) {
+      setSearchedBib(bib);
+      setHasSearched(true);
+      loadPhotos({ search: bib });
+    } else {
+      setSearchedBib('');
+      setHasSearched(false);
+      loadPhotos({});
+    }
   };
 
-  const handleLoadMore = () => {
-    searchPhotos(currentPage + 1, true);
-  };
+  const handleLoadMore = useCallback(() => {
+    loadPhotos({
+      search: hasSearched ? searchedBib : undefined,
+      page: currentPage + 1,
+      append: true,
+    });
+  }, [hasSearched, searchedBib, currentPage, loadPhotos]);
 
+  const loading = initialLoading || loadingMore;
   const hasMore = photos.length < totalPhotos;
 
   return (
@@ -220,59 +257,32 @@ export default function EventPage() {
 
       {/* Results */}
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {hasSearched && (
+        {totalPhotos > 0 && (
           <div className="mb-6 flex items-center justify-between">
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              {totalPhotos > 0 ? (
+              {hasSearched ? (
                 <>
                   Tìm thấy <span className="font-semibold text-zinc-900 dark:text-white">{totalPhotos}</span> ảnh cho số bib{' '}
                   <span className="font-semibold text-zinc-900 dark:text-white">{searchedBib}</span>
                 </>
               ) : (
                 <>
-                  Không tìm thấy ảnh cho số bib <span className="font-semibold">{searchedBib}</span>
+                  Tổng cộng <span className="font-semibold text-zinc-900 dark:text-white">{totalPhotos}</span> ảnh
                 </>
               )}
             </p>
-            {totalPhotos > 0 && (
-              <p className="text-sm text-zinc-400 dark:text-zinc-500">
-                Đang hiển thị {photos.length} / {totalPhotos}
-              </p>
-            )}
+            <p className="text-sm text-zinc-400 dark:text-zinc-500">
+              Đang hiển thị {photos.length} / {totalPhotos}
+            </p>
           </div>
         )}
 
-        {!hasSearched ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-20 w-20 text-zinc-300 dark:text-zinc-700"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <p className="mt-4 text-lg font-medium text-zinc-500 dark:text-zinc-400">
-              Nhập số bib để tìm kiếm ảnh của bạn
-            </p>
-            <p className="mt-1 text-sm text-zinc-400 dark:text-zinc-500">
-              Ảnh sẽ được hiển thị theo số bib trên áo
-            </p>
-          </div>
-        ) : (
-          <PhotoGrid
-            photos={photos}
-            loading={loading}
-            hasMore={hasMore}
-            onLoadMore={handleLoadMore}
-          />
-        )}
+        <PhotoGrid
+          photos={photos}
+          loading={loading}
+          hasMore={hasMore}
+          onLoadMore={handleLoadMore}
+        />
       </main>
 
       {/* Footer */}

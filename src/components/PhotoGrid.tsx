@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Photo } from '@/types';
 import Lightbox from './Lightbox';
@@ -16,6 +16,29 @@ interface PhotoGridProps {
 export default function PhotoGrid({ photos, loading, hasMore, onLoadMore }: PhotoGridProps) {
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
+
+  useEffect(() => {
+    if (!hasMore || !onLoadMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loadingRef.current) {
+          onLoadMore();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+
+    const el = sentinelRef.current;
+    if (el) observer.observe(el);
+
+    return () => {
+      if (el) observer.unobserve(el);
+    };
+  }, [hasMore, onLoadMore]);
 
   const handleDownload = async (e: React.MouseEvent, photo: Photo) => {
     e.stopPropagation();
@@ -26,6 +49,19 @@ export default function PhotoGrid({ photos, loading, hasMore, onLoadMore }: Phot
       setDownloadingId(null);
     }
   };
+
+  if (photos.length === 0 && loading) {
+    return (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <div
+            key={i}
+            className="aspect-square animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800"
+          />
+        ))}
+      </div>
+    );
+  }
 
   if (photos.length === 0 && !loading) {
     return (
@@ -46,9 +82,6 @@ export default function PhotoGrid({ photos, loading, hasMore, onLoadMore }: Phot
         </svg>
         <p className="mt-4 text-lg font-medium text-zinc-500 dark:text-zinc-400">
           Không tìm thấy ảnh nào
-        </p>
-        <p className="mt-1 text-sm text-zinc-400 dark:text-zinc-500">
-          Vui lòng kiểm tra lại số bib
         </p>
       </div>
     );
@@ -108,26 +141,18 @@ export default function PhotoGrid({ photos, loading, hasMore, onLoadMore }: Phot
         ))}
       </div>
 
-      {/* Load more button */}
+      {/* Infinite scroll sentinel */}
       {hasMore && (
-        <div className="mt-8 flex justify-center">
-          <button
-            onClick={onLoadMore}
-            disabled={loading}
-            className="rounded-full bg-blue-600 px-8 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? (
-              <span className="flex items-center gap-2">
-                <svg className="h-5 w-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Đang tải...
-              </span>
-            ) : (
-              'Xem thêm ảnh'
-            )}
-          </button>
+        <div ref={sentinelRef} className="mt-8 flex justify-center py-4">
+          {loading && (
+            <span className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
+              <svg className="h-5 w-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Đang tải thêm...
+            </span>
+          )}
         </div>
       )}
 

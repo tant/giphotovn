@@ -34,6 +34,7 @@ export async function fetchPhotos(params: {
   search?: string;
   limit?: number;
   page?: number;
+  signal?: AbortSignal;
 }): Promise<PhotosResponse> {
   const formData = new FormData();
   formData.append('slug', params.slug);
@@ -51,6 +52,7 @@ export async function fetchPhotos(params: {
       'Authorization': `Bearer ${API_TOKEN}`,
     },
     body: formData,
+    signal: params.signal,
   });
 
   if (!response.ok) {
