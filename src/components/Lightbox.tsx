@@ -52,13 +52,13 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }: Lightbo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
       {/* Close button */}
       <button
         onClick={onClose}
-        className="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+        className="absolute right-4 top-4 z-10 rounded-xl bg-white/10 p-2.5 text-white transition-all hover:bg-white/20 hover:shadow-lg"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
@@ -66,16 +66,16 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }: Lightbo
       {/* Download button */}
       <button
         onClick={handleDownload}
-        className="absolute right-16 top-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+        className="absolute right-16 top-4 z-10 rounded-xl bg-white/10 p-2.5 text-white transition-all hover:bg-white/20 hover:shadow-lg"
         title="Download"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
         </svg>
       </button>
 
       {/* Counter */}
-      <div className="absolute left-4 top-4 z-10 rounded-full bg-white/10 px-3 py-1 text-sm text-white">
+      <div className="absolute left-4 top-4 z-10 rounded-xl bg-white/10 px-3.5 py-1.5 text-sm font-medium text-white backdrop-blur-sm">
         {currentIndex + 1} / {photos.length}
       </div>
 
@@ -83,9 +83,9 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }: Lightbo
       {hasPrev && (
         <button
           onClick={handlePrev}
-          className="absolute left-4 z-10 rounded-full bg-white/10 p-3 text-white transition-colors hover:bg-white/20"
+          className="absolute left-4 z-10 rounded-xl bg-white/10 p-3 text-white transition-all hover:bg-white/20 hover:shadow-lg"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
@@ -95,9 +95,9 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }: Lightbo
       {hasNext && (
         <button
           onClick={handleNext}
-          className="absolute right-4 z-10 rounded-full bg-white/10 p-3 text-white transition-colors hover:bg-white/20"
+          className="absolute right-4 z-10 rounded-xl bg-white/10 p-3 text-white transition-all hover:bg-white/20 hover:shadow-lg"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>

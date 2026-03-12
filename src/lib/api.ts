@@ -32,6 +32,7 @@ export async function fetchEvents(params?: {
 export async function fetchPhotos(params: {
   slug: string;
   search?: string;
+  image?: File;
   limit?: number;
   page?: number;
   signal?: AbortSignal;
@@ -39,6 +40,7 @@ export async function fetchPhotos(params: {
   const formData = new FormData();
   formData.append('slug', params.slug);
   if (params.search) formData.append('search', params.search);
+  if (params.image) formData.append('image', params.image);
   if (params.limit) formData.append('limit', params.limit.toString());
 
   let url = `${API_BASE_URL}/photos`;
@@ -48,14 +50,26 @@ export async function fetchPhotos(params: {
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${API_TOKEN}`,
-    },
+    headers,
     body: formData,
     signal: params.signal,
   });
 
   if (!response.ok) {
+    // API returns 400 when face search finds no matches
+    if (response.status === 400 && params.image) {
+      return {
+        current_page: 1,
+        data: [],
+        from: null,
+        last_page: 1,
+        per_page: params.limit || 50,
+        to: null,
+        total: 0,
+        next_page_url: null,
+        prev_page_url: null,
+      };
+    }
     throw new Error(`Failed to fetch photos: ${response.statusText}`);
   }
 

@@ -1,0 +1,286 @@
+'use client';
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Photo, Event } from '@/types';
+import { fetchPhotos, fetchEvents } from '@/lib/api';
+import PhotoGrid from '@/components/PhotoGrid';
+
+const PHOTOS_PER_PAGE = 50;
+
+export default function EventContent({ slug }: { slug: string }) {
+  const [event, setEvent] = useState<Event | null>(null);
+  const [bibNumber, setBibNumber] = useState('');
+  const [searchedBib, setSearchedBib] = useState('');
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [eventLoading, setEventLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPhotos, setTotalPhotos] = useState(0);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [faceImage, setFaceImage] = useState<File | null>(null);
+  const [facePreview, setFacePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const loadEvent = useCallback(async () => {
+    try {
+      setEventLoading(true);
+      const response = await fetchEvents({ search: slug, limit: 100 });
+      const foundEvent = response.data.find((e) => e.slug === slug);
+      setEvent(foundEvent || null);
+    } catch (error) {
+      console.error('Failed to load event:', error);
+    } finally {
+      setEventLoading(false);
+    }
+  }, [slug]);
+
+  const loadPhotos = useCallback(
+    async (options: { search?: string; image?: File; page?: number; append?: boolean }) => {
+      const { search, image, page = 1, append = false } = options;
+      const isLoadMore = append;
+
+      if (!isLoadMore) {
+        abortControllerRef.current?.abort();
+      }
+      const controller = new AbortController();
+      if (!isLoadMore) {
+        abortControllerRef.current = controller;
+      }
+
+      try {
+        if (isLoadMore) {
+          setLoadingMore(true);
+        } else {
+          setInitialLoading(true);
+        }
+
+        const response = await fetchPhotos({
+          slug,
+          search,
+          image,
+          limit: PHOTOS_PER_PAGE,
+          page,
+          signal: controller.signal,
+        });
+
+        if (controller.signal.aborted) return;
+
+        if (append) {
+          setPhotos((prev) => [...prev, ...response.data]);
+        } else {
+          setPhotos(response.data);
+        }
+
+        setTotalPhotos(response.total);
+        setCurrentPage(response.current_page);
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          console.error('Failed to fetch photos:', error);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setInitialLoading(false);
+          setLoadingMore(false);
+        }
+      }
+    },
+    [slug]
+  );
+
+  useEffect(() => {
+    loadEvent();
+    loadPhotos({});
+    return () => abortControllerRef.current?.abort();
+  }, [loadEvent, loadPhotos]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const bib = bibNumber.trim();
+    if (bib || faceImage) {
+      setSearchedBib(bib);
+      setHasSearched(true);
+      loadPhotos({ search: bib || undefined, image: faceImage || undefined });
+    } else {
+      setSearchedBib('');
+      setHasSearched(false);
+      loadPhotos({});
+    }
+  };
+
+  const handleFaceImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFaceImage(file);
+      const reader = new FileReader();
+      reader.onload = (ev) => setFacePreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+      // Auto-search immediately when image is selected
+      const bib = bibNumber.trim();
+      setSearchedBib(bib);
+      setHasSearched(true);
+      loadPhotos({ search: bib || undefined, image: file });
+    }
+  };
+
+  const clearFaceImage = () => {
+    setFaceImage(null);
+    setFacePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleLoadMore = useCallback(() => {
+    loadPhotos({
+      search: hasSearched ? searchedBib : undefined,
+      image: hasSearched ? (faceImage || undefined) : undefined,
+      page: currentPage + 1,
+      append: true,
+    });
+  }, [hasSearched, searchedBib, faceImage, currentPage, loadPhotos]);
+
+  const loading = initialLoading || loadingMore;
+  const hasMore = photos.length < totalPhotos;
+
+  return (
+    <>
+      {/* Event info & Search */}
+      <div className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          {eventLoading ? (
+            <div className="animate-pulse">
+              <div className="h-8 w-2/3 rounded-xl bg-zinc-200 dark:bg-zinc-800" />
+              <div className="mt-3 h-4 w-1/3 rounded-lg bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+          ) : event ? (
+            <>
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-white sm:text-2xl">
+                {event.event_name}
+              </h2>
+              <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-zinc-500 dark:text-zinc-400">
+                <span className="flex items-center gap-1.5">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900/30">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  {new Date(event.event_date).toLocaleDateString('vi-VN')}
+                </span>
+                {event.province && (
+                  <span className="flex items-center gap-1.5">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-green-100 dark:bg-green-900/30">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+                    {event.province}
+                  </span>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="text-zinc-500">Không tìm thấy giải đấu</p>
+          )}
+
+          {/* Search form */}
+          <form onSubmit={handleSearch} className="mt-6">
+            <div className="flex gap-3">
+              <div className="relative flex-1 sm:max-w-md">
+                <input
+                  type="text"
+                  placeholder="Nhập số bib của bạn..."
+                  value={bibNumber}
+                  onChange={(e) => setBibNumber(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-300 bg-white px-4 py-3.5 text-base shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                />
+              </div>
+
+              {/* Face search upload */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFaceImageChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 py-3.5 text-zinc-700 shadow-sm transition-all hover:bg-zinc-50 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                title="Tìm bằng khuôn mặt"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="hidden sm:inline text-sm font-medium">Tìm bằng ảnh</span>
+              </button>
+
+              <button
+                type="submit"
+                disabled={(!bibNumber.trim() && !faceImage) || loading}
+                className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 font-semibold text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <span className="hidden sm:inline">Tìm kiếm</span>
+              </button>
+            </div>
+
+            {/* Face image preview */}
+            {facePreview && (
+              <div className="mt-3 flex items-center gap-3">
+                <div className="relative h-12 w-12 overflow-hidden rounded-xl border border-zinc-200 shadow-sm dark:border-zinc-700">
+                  <img src={facePreview} alt="Face" className="h-full w-full object-cover" />
+                </div>
+                <span className="text-sm text-zinc-500 dark:text-zinc-400">Ảnh khuôn mặt đã chọn</span>
+                <button
+                  type="button"
+                  onClick={clearFaceImage}
+                  className="rounded-lg px-2 py-1 text-sm text-red-500 transition-colors hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20"
+                >
+                  Xóa
+                </button>
+              </div>
+            )}
+          </form>
+        </div>
+      </div>
+
+      {/* Results */}
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {totalPhotos > 0 && (
+          <div className="mb-6 flex items-center justify-between">
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              {hasSearched ? (
+                <>
+                  Tìm thấy <span className="font-semibold text-zinc-900 dark:text-white">{totalPhotos}</span> ảnh
+                  {searchedBib && (
+                    <> cho số bib <span className="font-semibold text-zinc-900 dark:text-white">{searchedBib}</span></>
+                  )}
+                  {faceImage && !searchedBib && ' bằng khuôn mặt'}
+                </>
+              ) : (
+                <>
+                  Tổng cộng <span className="font-semibold text-zinc-900 dark:text-white">{totalPhotos}</span> ảnh
+                </>
+              )}
+            </p>
+            <p className="text-sm text-zinc-400 dark:text-zinc-500">
+              Đang hiển thị {photos.length} / {totalPhotos}
+            </p>
+          </div>
+        )}
+
+        <PhotoGrid
+          photos={photos}
+          loading={loading}
+          hasMore={hasMore}
+          onLoadMore={handleLoadMore}
+        />
+      </main>
+    </>
+  );
+}
